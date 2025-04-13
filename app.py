@@ -1,64 +1,52 @@
 import streamlit as st
+import random
+import numpy as np
 import pandas as pd
-import plotly.express as px
-from matplotlib.colors import LinearSegmentedColormap as lscmap
+import matplotlib.pyplot as plt
 
-@st.cache_data
-def load_data(filepath: str) -> pd.DataFrame:
-	return pd.read_excel(
-		filepath, 
-		engine='openpyxl',
-		skiprows=2,
-		usecols="A:E"
-	)
+def detection_rate_page():
+	df = pd.read_csv("data/total.csv")
+	
+	plt.style.use("dark_background")
 
-@st.cache_data
-def filter_data(data: pd.DataFrame) -> pd.DataFrame:
-	data = data[
-		data['Jednostka podziału administracyjnego'] == 'Polska'
-	].iloc[:, 1:]
-	
-	for col in data.select_dtypes(include='float64'):
-		data[col] = data[col].map('{:.0f}'.format)
-	
-	return data
-	
-green_red_cmap = lscmap.from_list(
-	'green_red', ['green', 'orange', 'red'], N=256
-)
-red_green_cmap = lscmap.from_list(
-	'red_green', ['red', 'orange', 'green'], N=256
-)
+	fig, ax = plt.subplots(figsize=(8, 4))
+	ax.plot(df["Year"], df["Detection Rate"], color="green", marker="o", label="Detection rate (%)", linewidth=3)
+	ax.set_xlabel("Year", fontsize=12)
+	ax.set_title("Crime detection rates over time", fontsize=16)
+	ax.legend()
+
+	ax.set_xticks(df["Year"])
+	ax.set_yticks(np.arange(start=df["Detection Rate"].min(), stop=(df["Detection Rate"].max() + 4), step=4))
+	ax.tick_params(axis="x", rotation=315)
+	fig.tight_layout()
+	ax.grid(True, linestyle="--", alpha=0.5)
+
+	st.pyplot(fig)
+
+def placeholder_page():
+	st.title("Placeholder")
 
 def main():
-	filepath = 'https://statystyka.policja.pl/download/20/232277/przestepstwa-ogolem-do-2021.xlsx' 	
+	st.set_page_config(page_title="Crime in Warsaw")
 	
-	data = filter_data(load_data(filepath))
-
-	st.title('Crimes in Poland 1999 - 2021')
-	st.dataframe(
-		data.set_index('Rok').style
-		.background_gradient(cmap=red_green_cmap, subset=['% wykrycia'])
-		.background_gradient(cmap=green_red_cmap, subset=['Przestępstwa stwierdzone']),
-		height=842		
-	)
+	pages = {
+		"Detection rate": detection_rate_page,
+		"placeholder": placeholder_page
+	}
 	
-	st.subheader('Area chart')
-	st.plotly_chart(px.area(
-		data,
-		x='Rok',		
-		y='Przestępstwa stwierdzone',
-		title='Crimes identified',
-		markers=True
-	))
+	choice = st.selectbox("Choose a page:", ["--Select--"] + list(pages.keys()))
+	if choice != "--Select--":
+		st.session_state["selected_page"] = choice
+	
+	if st.button("Pick randomly"):
+		st.session_state["selected_page"] = random.choice(list(pages.keys()))
+	
+	st.sidebar.header("Pages")
+	for page in list(pages.keys()):
+		if st.sidebar.button(page, key=f"sidebar_{page}"):
+			st.session_state["selected_page"] = page
 
-	st.subheader('Column chart')
-	st.plotly_chart(px.bar(
-		data,
-		x='Rok',
-		y='Przestępstwa wykryte',
-		title='Crimes'
-	))
+	if "selected_page" in st.session_state:
+		pages[st.session_state["selected_page"]]()
 
 main()
-
